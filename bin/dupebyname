@@ -1,0 +1,89 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use open qw(locale);
+
+use Getopt::Long;
+use Scalar::Util qw(looks_like_number);
+
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+
+use File::Dupes::Find::ByFilename qw(find_by_filename);
+use File::Dupes::Find::Confirm qw(confirm_duplicates confirm_hard_links);
+
+our $verbose = 0;
+our $dry_run = 0;
+our $test = 0;
+
+Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
+Getopt::Long::GetOptions(
+    "v|verbose+" => \$verbose,
+    "n|dry-run" => \$dry_run,
+    "t|test" => \$test,
+) or die("unknown option\n");
+
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
+
+my $min_size = 1048576;
+if (scalar @ARGV && looks_like_number($ARGV[0])) {
+    $min_size = shift(@ARGV);
+}
+
+die("not enough arguments\n") if scalar @ARGV < 1;
+my (@dirnames) = @ARGV;
+
+my $callback = sub {
+    my (%args) = @_;
+    my @filenames = @{$args{filenames}};
+    my %hard_link_groups = %{$args{hard_link_groups}};
+    if ($verbose >= 2) {
+        printf("found a set of duplicate filenames\n");
+        foreach my $filename (@filenames) {
+            print("-   $filename\n");
+            my @links = @{$hard_link_groups{$filename}};
+            shift(@links);
+            foreach my $link (@links) {
+                print("    hard-linked as $link\n");
+            }
+        }
+    }
+    if ($test) {
+        confirm_duplicates(@filenames);
+        if ($verbose) {
+            warn("duplicate file check passed: ", join("\n                             ", @filenames), "\n");
+        }
+        foreach my $filename (@filenames) {
+            my @links = @{$hard_link_groups{$filename}};
+            confirm_hard_links(@links);
+            if ($verbose) {
+                warn("hard links check passed: ", join("\n                         ", @links), "\n");
+            }
+        }
+    }
+    my ($main_filename, @other_filenames) = @filenames;
+    foreach my $filename (@other_filenames) {
+        my @links = @{$hard_link_groups{$filename}};
+        foreach my $link (@links) {
+            if ($dry_run) {
+                warn("DRY RUN: rm $link\n");
+            } else {
+                if (unlink($link)) {
+                    if ($verbose) {
+                        warn("removed $link\n");
+                    }
+                } else {
+                    warn("$link: $!\n");
+                }
+            }
+        }
+    }
+};
+
+find_by_filename(@dirnames, {
+    verbose => $verbose,
+    callback => $callback,
+    progress => 1,
+    min_size => $min_size,
+});
