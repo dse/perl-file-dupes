@@ -50,13 +50,21 @@ sub remove_callback {
     @other_filenames = grep { $_ !~ m{^\Q$no_delete_dir\E/} } @other_filenames; # never delete files here
     foreach my $filename (@other_filenames) {
         my @links = @{$hard_link_groups{$filename}};
+        my $index = 0;
+        my $count = scalar @links;
         foreach my $link (@links) {
+            my $bytes = -s $links[0];
+            ++$index;
+            my $suffix = sprintf("(%d/%d - %d bytes)", $index, $count, $bytes);
+            if (scalar @links == 1) {
+                $suffix = sprintf("(%d bytes)", $bytes);
+            }
             if ($dry_run) {
-                warn("DRY RUN: rm $link\n");
+                warn("DRY RUN: rm $link $suffix\n");
             } else {
                 if (unlink($link)) {
                     if ($verbose) {
-                        warn("removed $link\n");
+                        warn("removed $link $suffix\n");
                     }
                 } else {
                     warn("$link: $!\n");
