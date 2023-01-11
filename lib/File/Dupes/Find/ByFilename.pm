@@ -127,7 +127,7 @@ sub find_by_filename {
             }
             my @file_groups = check_for_dupes(@main_filenames);
             foreach my $file_group (@file_groups) {
-                my @group_filenames = map { $_->{filename} } @$file_group;
+                my @group_filenames = @$file_group;
                 push(@results, [@group_filenames]) if defined wantarray;
                 if ($callback && ref $callback eq 'CODE') {
                     &$callback(filenames => \@group_filenames,

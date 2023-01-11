@@ -2,6 +2,8 @@ package File::Dupes;
 use warnings;
 use strict;
 
+use Symbol;
+
 use base 'Exporter';
 
 our @EXPORT = ();
@@ -13,63 +15,90 @@ our %EXPORT_TAGS = (
 
 sub group_hard_links {
     my (@filenames) = @_;
+
+    # group hard links together.
     my %hard_links;
     foreach my $filename (@filenames) {
         my @lstat = lstat($filename);
-        next unless scalar @lstat;
         my ($dev, $ino) = @lstat;
+        next if !defined $dev || !defined $ino;
         push(@{$hard_links{$dev,$ino}}, $filename);
     }
-    my @groups;
-    foreach my $key (keys %hard_links) {
-        push(@groups, $hard_links{$key});
-    }
+    my @groups = values %hard_links;
+
+    # in order of initial appearance in list
+    my %index_of = indexed(@filenames);
+    @groups = sort { $index_of{$a->[0]} <=> $index_of{$b->[0]} } @groups;
+
     return @groups if wantarray;
     return [@groups];
 }
 
+sub indexed {
+    my (@filenames) = @_;
+    my %index_of;
+    for (my $i = 0; $i < scalar @filenames; $i += 1) {
+        $index_of{$filenames[$i]} //= $i;
+    }
+    return %index_of if wantarray;
+    return {%index_of} if defined wantarray;
+}
+
 sub check_for_dupes {
     my (@filenames) = @_;
-    my @objects = map { { filename => $_ } } @filenames;
-    foreach my $object (@objects) {
-        my $fh;
-        if (!open($fh, '<:raw', $object->{filename})) {
-            $object->{error} = $!;
+
+    # exclude hard links from duplicate checking.
+    my @hard_link_groups = group_hard_links(@filenames);
+    @filenames = map { $_->[0] } @hard_link_groups;
+
+    return if scalar @filenames < 2; # sanity check
+
+    my %error;
+    my %fh;
+
+    # open all files.
+    foreach my $filename (@filenames) {
+        my $fh = gensym();
+        if (!open($fh, '<:raw', $filename)) {
+            $error{$filename} = $!;
         } else {
-            $object->{fh} = $fh;
+            $fh{$filename} = $fh;
         }
     }
-    @objects = grep { !$_->{error} } @objects;
-    return if scalar @objects < 2;
 
-    my @results;
+    @filenames = grep { defined $fh{$_} } @filenames; # successful files only
+    return if scalar @filenames < 2; # sanity check
 
-    my @groups = ( [@objects] );
+    my @results;    # collect groups of files having the same content.
+    my @groups = ([@filenames]); # initialize with one group
     while (1) {
-        my @newgroups;
+        my @newgroups; # collect groups for next iteration of this loop
         foreach my $group (@groups) {
-            my @done;
-            my %group;
-            foreach my $obj (@$group) {
+            # all files in here have the same content thus far.
+            my @done; # collect files we finished reading last iteration
+            my %group; # yes, we're using 4096-byte chunks as hash keys :-D
+            foreach my $filename (@$group) {
                 my $data;
-                my $bytes = sysread($obj->{fh}, $data, 4096);
+                my $bytes = sysread($fh{$filename}, $data, 4096);
                 if (!defined $bytes) {
-                    close($obj->{fh});
-                    delete $obj->{fh};
+                    close($fh{$filename});
+                    delete $fh{$filename};
                 } elsif (!$bytes) {
-                    close($obj->{fh});
-                    delete $obj->{fh};
-                    push(@done, $obj);
+                    close($fh{$filename});
+                    delete $fh{$filename};
+                    push(@done, $filename);
                 } else {
-                    push(@{$group{$data}}, $obj) if defined $data;
+                    push(@{$group{$data}}, $filename) if defined $data;
                 }
             }
             if (scalar @done >= 2) {
+                # we have a group of files ready to return
                 push(@results, [@done]);
             }
             foreach my $key (keys %group) {
                 my $group = $group{$key};
                 if (scalar @$group >= 2) {
+                    # we have a group of files ready for next loop iteration
                     push(@newgroups, $group);
                 }
             }

@@ -85,7 +85,7 @@ sub find_side_by_side_1 {
         }
         my @file_groups = check_for_dupes(@main_filenames);
         foreach my $file_group (@file_groups) {
-            my @group_filenames = map { $_->{filename} } @$file_group;
+            my @group_filenames = @$file_group;
             push(@results, [@group_filenames]) if defined wantarray;
             if ($callback && ref $callback eq 'CODE') {
                 progress() if $progress;
