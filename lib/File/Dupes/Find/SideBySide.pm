@@ -65,12 +65,13 @@ sub find_side_by_side_1 {
     my $count;
     my @results;
     my $wanted = sub {
-        if ($progress) {
-            $count += 1;
-            progress("%8d %s", $count, $_) if $count % $PROGRESS_EVERY == 0;
-        }
         my $filename = $_;
         my $first_filename = $_;
+
+        if ($progress) {
+            $count += 1;
+            progress("%8d %s", $count, $filename) if $count % $PROGRESS_EVERY == 0;
+        }
 
         my @lstat = lstat($filename);
         return if (!scalar @lstat);
