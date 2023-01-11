@@ -52,7 +52,7 @@ sub find_by_filename {
         my $wanted = sub {
             if ($progress) {
                 $count += 1;
-                progress("%8d %s", $File::Find::name) if $count % $PROGRESS_EVERY == 0;
+                progress("%8d %s", $count, $File::Find::name) if $count % $PROGRESS_EVERY == 0;
             }
             my $basename = $_;
             my $filename = $File::Find::name;
