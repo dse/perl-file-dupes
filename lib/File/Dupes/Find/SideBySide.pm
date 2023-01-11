@@ -12,6 +12,7 @@ our %EXPORT_TAGS = (
 );
 
 our $DEFAULT_MIN_SIZE = 1048576;
+our $PROGRESS_EVERY = 233;
 
 use File::Find qw();
 use Digest::SHA qw();
@@ -61,14 +62,12 @@ sub find_side_by_side_1 {
     my $progress = $options{progress};
 
     my ($dir, @other_dirs) = @dirs;
-    my %count;
+    my $count;
     my @results;
-    my %index; # order in which directories specified and filenames found
-    my $index = 0;
     my $wanted = sub {
         if ($progress) {
-            my $count = ($count{$File::Find::dir} += 1);
-            progress("%s %d", $File::Find::dir, $count);
+            $count += 1;
+            progress("%8d %s", $count, $_) if $count % $PROGRESS_EVERY == 0;
         }
         my $filename = $_;
         my $first_filename = $_;
@@ -85,9 +84,6 @@ sub find_side_by_side_1 {
         my @other_filenames = map { "$_/$rel" } @other_dirs;
         @other_filenames = grep { -f $_ && -s $_ == $size } @other_filenames;
         return unless scalar @other_filenames;
-        foreach my $other_filename (@other_filenames) {
-            $index{$other_filename} = ++$index;
-        }
         my @filenames = ($filename, @other_filenames);
         my @hard_link_groups = group_hard_links(@filenames);
         return if scalar @hard_link_groups < 2;
@@ -100,7 +96,6 @@ sub find_side_by_side_1 {
         my @file_groups = check_for_dupes(@main_filenames);
         foreach my $file_group (@file_groups) {
             my @group_filenames = @$file_group;
-            @group_filenames = sort { $index{$a} <=> $index{$b} } @group_filenames; # for good measure
             push(@results, [@group_filenames]) if defined wantarray;
             if ($callback && ref $callback eq 'CODE') {
                 progress() if $progress;

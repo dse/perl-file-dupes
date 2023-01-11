@@ -41,10 +41,9 @@ sub find_by_filename {
     my $verify   = $options{verify};
     my $progress = $options{progress};
 
-    my %is_a_first_filename;
-    my %by_basename;
-    my %index; # order in which directories specified and filenames found
-    my $index = 0;
+    my %filenames_by_basename;
+    my %devino;
+    my %size;
     foreach my $dir (@dirs) {
         if ($verbose) {
             warn("Finding files in ${dir} ...\n");
@@ -53,7 +52,7 @@ sub find_by_filename {
         my $wanted = sub {
             if ($progress) {
                 $count += 1;
-                progress("%d files found", $count) if $count % $PROGRESS_EVERY == 0;
+                progress("%8d %s", $File::Find::name) if $count % $PROGRESS_EVERY == 0;
             }
             my $basename = $_;
             my $filename = $File::Find::name;
@@ -63,11 +62,9 @@ sub find_by_filename {
             return if (-d _) || (!-f _) || (-s _ < $min_size);
 
             my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = @lstat;
-            if ($dir eq $dirs[0]) {
-                $is_a_first_filename{$filename} = 1;
-            }
-            push(@{$by_basename{$basename}}, { filename => $filename, dev => $dev, ino => $ino, size => $size });
-            $index{$filename} = ++$index;
+            push(@{$filenames_by_basename{$basename}}, $filename);
+            $devino{$filename} = [$dev,$ino];
+            $size{$filename} = $size;
         };
         progress() if $progress;
         File::Find::find({ wanted => $wanted }, $dir);
@@ -77,44 +74,25 @@ sub find_by_filename {
         }
     }
     my @results;
-    my $total = scalar keys %by_basename;
+    my $total = scalar keys %filenames_by_basename;
     if ($verbose) {
         progress();
-        printf STDERR ("%d basenames found; removing non-duplicates\n", $total);
-    }
-    foreach my $basename (keys %by_basename) {
-        if (scalar @{$by_basename{$basename}} < 2) {
-            delete $by_basename{$basename};
-            $total -= 1;
-            if ($progress) {
-                progress("%d basenames found", $total) if $total % $PROGRESS_EVERY == 0;
-            }
-        }
-    }
-    if ($verbose) {
-        progress();
-        printf STDERR ("%d basenames total after removing non-duplicates\n", $total);
+        printf STDERR ("%d unique base filenames found\n");
     }
     my $count = 0;
-    foreach my $basename (keys %by_basename) {
+    foreach my $basename (keys %filenames_by_basename) {
         if ($progress) {
             $count += 1;
             progress("%d/%d", $count, $total) if $count % $PROGRESS_EVERY == 0;
         }
-        my @by_basename = @{$by_basename{$basename}};
-        next if scalar @by_basename < 2;
-        my $first_basename = $by_basename[0]{filename};
+        my @filenames = @{$filenames_by_basename{$basename}};
+        my %index = map { ($filenames[$_] => $_) } (0 .. $#filenames);
+        next if scalar @filenames < 2;
+        my $first_filename = $filenames[0];
         my %filenames_by_dev_ino;
-        foreach my $record (@by_basename) {
-            my $dev = $record->{dev};
-            my $ino = $record->{ino};
-            push(@{$filenames_by_dev_ino{$dev,$ino}}, $record->{filename});
-        }
-        my %size_by_filename;
-        foreach my $record (@by_basename) {
-            my $filename = $record->{filename};
-            my $size = $record->{size};
-            $size_by_filename{$filename} = $size;
+        foreach my $filename (@filenames) {
+            my ($dev, $ino) = @{$devino{$filename}};
+            push(@{$filenames_by_dev_ino{$dev,$ino}}, $filename);
         }
         my %hardlinks_by_main_filename;
         foreach my $key (keys %filenames_by_dev_ino) {
@@ -122,16 +100,16 @@ sub find_by_filename {
             my $main_filename = $filenames[0];
             $hardlinks_by_main_filename{$main_filename} = $filenames_by_dev_ino{$key};
         }
-        my @main_filenames = sort keys %hardlinks_by_main_filename;
+        my @main_filenames = sort { $index{$a} <=> $index{$b} } keys %hardlinks_by_main_filename; # for good measure
         my %main_filenames_by_size;
         foreach my $main_filename (@main_filenames) {
-            my $size = $size_by_filename{$main_filename};
+            my $size = $size{$main_filename};
             push(@{$main_filenames_by_size{$size}}, $main_filename);
         }
         foreach my $size (keys %main_filenames_by_size) {
             my @main_filenames = @{$main_filenames_by_size{$size}};
             next if scalar @main_filenames < 2;
-            @main_filenames = sort { ($index{$a} <=> $index{$b}) || ($a cmp $b) } @main_filenames;
+            @main_filenames = sort { $index{$a} <=> $index{$b} } @main_filenames; # for good measure
             my %hard_link_groups;
             foreach my $main_filename (@main_filenames) {
                 $hard_link_groups{$main_filename} = $hardlinks_by_main_filename{$main_filename};
