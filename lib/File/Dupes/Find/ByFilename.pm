@@ -133,6 +133,13 @@ sub find_by_filename {
                 }
             }
         }
+
+        # free up memory gradually.
+        foreach my $filename (@{$filenames_by_basename{$basename}}) {
+            delete $devino{$filename};
+            delete $size{$filename};
+        }
+        delete $filenames_by_basename{$basename};
     }
     progress();
     return @results if wantarray;
