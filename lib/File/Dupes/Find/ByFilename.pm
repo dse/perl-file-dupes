@@ -12,6 +12,7 @@ our %EXPORT_TAGS = (
 );
 
 our $DEFAULT_MIN_SIZE = 1048576;
+our $PROGRESS_EVERY = 233;
 
 use File::Find;
 
@@ -35,6 +36,7 @@ sub find_by_filename {
     my $min_size = $options{min_size} // $DEFAULT_MIN_SIZE;
     my $callback = $options{callback};
     my $verbose  = $options{verbose};
+    my $progress = $options{progress};
     my %by_basename;
     my %index;
     my $index = 0;
@@ -42,7 +44,12 @@ sub find_by_filename {
         if ($verbose) {
             warn("Finding files in ${dir} ...\n");
         }
+        my $count = 0;
         my $wanted = sub {
+            if ($progress) {
+                $count += 1;
+                progress("%d files found", $count) if $count % $PROGRESS_EVERY == 0;
+            }
             my $basename = $_;
             my $filename = $File::Find::name;
             my @lstat = lstat($_);
@@ -52,11 +59,40 @@ sub find_by_filename {
             push(@{$by_basename{$basename}}, { filename => $filename, dev => $dev, ino => $ino, size => $size });
             $index{$filename} = ++$index; # in order in which directories are specified
         };
+        progress() if $progress;
         File::Find::find({ wanted => $wanted }, $dir);
+        progress() if $progress;
+        if ($verbose) {
+            printf STDERR ("%d files found\n", $count);
+        }
     }
     my @results;
+    my $total = scalar keys %by_basename;
+    if ($verbose) {
+        progress();
+        printf STDERR ("%d basenames found; removing non-duplicates\n", $total);
+    }
     foreach my $basename (keys %by_basename) {
+        if (scalar @{$by_basename{$basename}} < 2) {
+            delete $by_basename{$basename};
+            $total -= 1;
+            if ($progress) {
+                progress("%d basenames found", $total) if $total % $PROGRESS_EVERY == 0;
+            }
+        }
+    }
+    if ($verbose) {
+        progress();
+        printf STDERR ("%d basenames total after removing non-duplicates\n", $total);
+    }
+    my $count = 0;
+    foreach my $basename (keys %by_basename) {
+        if ($progress) {
+            $count += 1;
+            progress("%d/%d", $count, $total) if $count % $PROGRESS_EVERY == 0;
+        }
         my @by_basename = @{$by_basename{$basename}};
+        next if scalar @by_basename < 2;
         my %filenames_by_dev_ino;
         foreach my $record (@by_basename) {
             my $dev = $record->{dev};
@@ -100,8 +136,24 @@ sub find_by_filename {
             }
         }
     }
+    progress();
     return @results if wantarray;
     return [@results] if defined wantarray;
+}
+
+sub progress {
+    state $ready = 1;
+    return unless -t 2;
+    my ($format, @args) = @_;
+    if (!defined $format) {
+        return if $ready;
+        print STDERR "\r\e[K";
+        $ready = 1;
+        return;
+    }
+    $ready = 0;
+    my $string = sprintf($format, @args);
+    print STDERR "\r" . $string . "\e[K";
 }
 
 1;
