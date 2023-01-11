@@ -43,7 +43,7 @@ sub find_by_filename {
 
     my %is_a_first_filename;
     my %by_basename;
-    my %index;
+    my %index; # order in which directories specified and filenames found
     my $index = 0;
     foreach my $dir (@dirs) {
         if ($verbose) {
@@ -63,7 +63,9 @@ sub find_by_filename {
             return if (-d _) || (!-f _) || (-s _ < $min_size);
 
             my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = @lstat;
-            $is_a_first_filename{$filename} = 1;
+            if ($dir eq $dirs[0]) {
+                $is_a_first_filename{$filename} = 1;
+            }
             push(@{$by_basename{$basename}}, { filename => $filename, dev => $dev, ino => $ino, size => $size });
             $index{$filename} = ++$index; # in order in which directories are specified
         };
@@ -101,6 +103,7 @@ sub find_by_filename {
         }
         my @by_basename = @{$by_basename{$basename}};
         next if scalar @by_basename < 2;
+        my $first_basename = $by_basename[0]{filename};
         my %filenames_by_dev_ino;
         foreach my $record (@by_basename) {
             my $dev = $record->{dev};
@@ -147,16 +150,23 @@ sub find_by_filename {
                         progress => $progress,
                     );
                     {
-                        my ($junk, @filenames) = @group_filenames;
-                        if (grep { $is_a_first_filename{$_} } @filenames) {
-                            warn("failed not-the-first-filename check:\n");
-                            foreach my $filename (@group_filenames) {
-                                if ($is_a_first_filename{$filename}) {
-                                    warn("*   $filename\n");
-                                } else {
-                                    warn("    $filename\n");
-                                }
-                            }
+                        my ($junk, @other_filenames) = @group_filenames;
+                        my @ordered_group_filenames = sort { $index{$a} <=> $index{$b} } @group_filenames;
+                        my $a = "@group_filenames";
+                        my $b = "@ordered_group_filenames";
+                        if ($a ne $b) {
+                            warn("filename order was not maintained\n");
+                            warn("initial order:\n");
+                            warn("    $_\n") foreach @ordered_group_filenames;
+                            warn("order might be deleted:\n");
+                            warn("    $_\n") foreach @group_filenames;
+                            die();
+                        }
+                        if (grep { $is_a_first_filename{$_} } @other_filenames) {
+                            warn("possibility of deleting filename in first directory specified is nonzero.\n");
+                            warn("first directory is: $dirs[0]\n");
+                            warn("order might be deleted:\n");
+                            warn("    $_\n") foreach @group_filenames;
                             die();
                         }
                     }
