@@ -50,12 +50,13 @@ sub find_by_filename {
         }
         my $count = 0;
         my $wanted = sub {
-            if ($progress) {
-                $count += 1;
-                progress("%8d %s", $count, $File::Find::name) if $count % $PROGRESS_EVERY == 0;
-            }
             my $basename = $_;
             my $filename = $File::Find::name;
+
+            if ($progress) {
+                $count += 1;
+                progress("%8d %s", $count, $filename) if $count % $PROGRESS_EVERY == 0;
+            }
 
             my @lstat = lstat($_);
             return if (!scalar @lstat);
