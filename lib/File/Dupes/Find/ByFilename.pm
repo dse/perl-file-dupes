@@ -128,6 +128,7 @@ sub find_by_filename {
                         dry_run => $dry_run,
                         verify => $verify,
                         progress => $progress,
+                        no_delete_dir => $dirs[0],
                     );
                     &$callback(%args);
                 }

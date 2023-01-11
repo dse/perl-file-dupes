@@ -107,6 +107,7 @@ sub find_side_by_side_1 {
                     dry_run => $dry_run,
                     verify => $verify,
                     progress => $progress,
+                    no_delete_dir => $dir,
                 );
                 &$callback(%args);
             }

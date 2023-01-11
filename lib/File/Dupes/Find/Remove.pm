@@ -18,6 +18,7 @@ sub remove_callback {
     my $verbose = $args{verbose};
     my $verify    = $args{verify};
     my $dry_run = $args{dry_run};
+    my $no_delete_dir = $args{no_delete_dir};
 
     my @filenames = @{$args{filenames}};
     my %hard_link_groups = %{$args{hard_link_groups}};
@@ -46,6 +47,7 @@ sub remove_callback {
         }
     }
     my ($main_filename, @other_filenames) = @filenames;
+    @other_filenames = grep { $_ !~ m{^\Q$no_delete_dir\E/} } @other_filenames; # never delete files here
     foreach my $filename (@other_filenames) {
         my @links = @{$hard_link_groups{$filename}};
         foreach my $link (@links) {
