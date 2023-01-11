@@ -53,9 +53,13 @@ sub find_side_by_side_1 {
     my %options = %$options;
     my $min_size = $options{min_size} // $DEFAULT_MIN_SIZE;
     my $callback = $options{callback};
-    my $progress = $options{progress};
-    my $verbose  = $options{verbose};
     my $done_hash = $options{done_hash};
+
+    my $verbose  = $options{verbose};
+    my $dry_run  = $options{dry_run};
+    my $test     = $options{test};
+    my $progress = $options{progress};
+
     my ($dir, @other_dirs) = @dirs;
     my %count;
     my @results;
@@ -90,7 +94,11 @@ sub find_side_by_side_1 {
             if ($callback && ref $callback eq 'CODE') {
                 progress() if $progress;
                 &$callback(filenames => \@group_filenames,
-                           hard_link_groups => \%hard_link_groups);
+                           hard_link_groups => \%hard_link_groups,
+                           verbose => $verbose,
+                           dry_run => $dry_run,
+                           test => $test,
+                           progress => $progress);
             }
         }
     };

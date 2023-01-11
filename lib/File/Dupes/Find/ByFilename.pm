@@ -35,8 +35,12 @@ sub find_by_filename {
     }
     my $min_size = $options{min_size} // $DEFAULT_MIN_SIZE;
     my $callback = $options{callback};
+
     my $verbose  = $options{verbose};
+    my $dry_run  = $options{dry_run};
+    my $test     = $options{test};
     my $progress = $options{progress};
+
     my %by_basename;
     my %index;
     my $index = 0;
@@ -131,7 +135,11 @@ sub find_by_filename {
                 push(@results, [@group_filenames]) if defined wantarray;
                 if ($callback && ref $callback eq 'CODE') {
                     &$callback(filenames => \@group_filenames,
-                               hard_link_groups => \%hard_link_groups);
+                               hard_link_groups => \%hard_link_groups,
+                               verbose => $verbose,
+                               dry_run => $dry_run,
+                               test => $test,
+                               progress => $progress);
                 }
             }
         }
