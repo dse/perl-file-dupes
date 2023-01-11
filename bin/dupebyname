@@ -16,12 +16,14 @@ use File::Dupes::Find::Confirm qw(confirm_duplicates confirm_hard_links);
 use File::Dupes::Find::Remove qw(remove_callback);
 
 our $verbose = 0;
+our $progress = 0;
 our $dry_run = 0;
 our $verify = 0;
 
 Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
 Getopt::Long::GetOptions(
     "v|verbose+" => \$verbose,
+    "progress+" => \$progress,
     "n|dry-run" => \$dry_run,
     "V|verify" => \$verify,
     "help" => sub { usage(); exit(0); },
@@ -29,7 +31,8 @@ Getopt::Long::GetOptions(
 
 sub usage { print <<"END"; }
 usage:
-    $PROGNAME [-v|--verbose] [-n|--dry-run] [-V|--verify] <dir> [<dir2> ...]
+    $PROGNAME [-v|--verbose] [--progress] [-n|--dry-run] [-V|--verify]
+         <dir> [<dir2> ...]
 END
 
 STDOUT->autoflush(1);
@@ -49,7 +52,8 @@ find_by_filename(@dirnames, {
     verify => $verify,
     verbose => $verbose,
     dry_run => $dry_run,
+    progress => $progress,
+
     callback => $callback,
-    progress => 1,
     min_size => $min_size,
 });
