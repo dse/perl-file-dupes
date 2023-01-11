@@ -77,7 +77,7 @@ sub find_by_filename {
     my $total = scalar keys %filenames_by_basename;
     if ($verbose) {
         progress();
-        printf STDERR ("%d unique base filenames found\n");
+        printf STDERR ("%d unique base filenames found\n", $total);
     }
     my $count = 0;
     foreach my $basename (keys %filenames_by_basename) {
