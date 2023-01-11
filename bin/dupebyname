@@ -15,13 +15,13 @@ use File::Dupes::Find::Remove qw(remove_callback);
 
 our $verbose = 0;
 our $dry_run = 0;
-our $test = 0;
+our $verify = 0;
 
 Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
 Getopt::Long::GetOptions(
     "v|verbose+" => \$verbose,
     "n|dry-run" => \$dry_run,
-    "t|test" => \$test,
+    "V|verify" => \$verify,
 ) or die("unknown option\n");
 
 STDOUT->autoflush(1);
@@ -38,7 +38,7 @@ my (@dirnames) = @ARGV;
 my $callback = \&remove_callback;
 
 find_by_filename(@dirnames, {
-    test => $test,
+    verify => $verify,
     verbose => $verbose,
     dry_run => $dry_run,
     callback => $callback,

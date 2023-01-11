@@ -28,4 +28,4 @@ echo 'hello musty world' >tmp/11/hello
 >&2 echo "dry run, verbose"
 ../bin/dupebyname -n -v 1 tmp/{1,2,3,4,5,6,7,8,9,10,11,12,13}
 >&2 echo "dry run, verbose, verify"
-../bin/dupebyname --test -n -v 1 tmp/{1,2,3,4,5,6,7,8,9,10,11,12,13}
+../bin/dupebyname --verify -n -v 1 tmp/{1,2,3,4,5,6,7,8,9,10,11,12,13}

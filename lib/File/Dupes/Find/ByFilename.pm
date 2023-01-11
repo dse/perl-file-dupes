@@ -38,7 +38,7 @@ sub find_by_filename {
 
     my $verbose  = $options{verbose};
     my $dry_run  = $options{dry_run};
-    my $test     = $options{test};
+    my $verify   = $options{verify};
     my $progress = $options{progress};
 
     my %by_basename;
@@ -138,7 +138,7 @@ sub find_by_filename {
                                hard_link_groups => \%hard_link_groups,
                                verbose => $verbose,
                                dry_run => $dry_run,
-                               test => $test,
+                               verify => $verify,
                                progress => $progress);
                 }
             }

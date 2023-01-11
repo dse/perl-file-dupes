@@ -16,7 +16,7 @@ use File::Dupes::Find::Confirm qw(confirm_duplicates confirm_hard_links);
 sub remove_callback {
     my (%args) = @_;
     my $verbose = $args{verbose};
-    my $test    = $args{test};
+    my $verify    = $args{verify};
     my $dry_run = $args{dry_run};
 
     my @filenames = @{$args{filenames}};
@@ -32,7 +32,7 @@ sub remove_callback {
             }
         }
     }
-    if ($test) {
+    if ($verify) {
         confirm_duplicates(@filenames);
         if ($verbose) {
             warn("duplicate file check passed: ", join("\n                             ", @filenames), "\n");
