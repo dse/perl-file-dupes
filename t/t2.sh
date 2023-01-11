@@ -23,4 +23,9 @@ echo 'hello shitty world' >tmp/9/hello
 echo 'hello cruel world' >tmp/10/hello #
 echo 'hello musty world' >tmp/11/hello
 
+>&2 echo "dry run"
+../bin/dupebyname -n 1 tmp/{1,2,3,4,5,6,7,8,9,10,11,12,13}
+>&2 echo "dry run, verbose"
+../bin/dupebyname -n -v 1 tmp/{1,2,3,4,5,6,7,8,9,10,11,12,13}
+>&2 echo "dry run, verbose, verify"
 ../bin/dupebyname --test -n -v 1 tmp/{1,2,3,4,5,6,7,8,9,10,11,12,13}

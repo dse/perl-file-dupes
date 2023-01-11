@@ -23,4 +23,9 @@ echo 'hello earth' >tmp/8/1
 ln tmp/8/1 tmp/9/1
 echo 'hello planet' >tmp/10/1
 
+>&2 echo "dry run"
+../bin/dupesxs -n 1 tmp/{1,2,3,4,5,6,7,8,9,10}
+>&2 echo "dry run, verbose"
+../bin/dupesxs -n -v 1 tmp/{1,2,3,4,5,6,7,8,9,10}
+>&2 echo "dry run, verbose, verify"
 ../bin/dupesxs --test -n -v 1 tmp/{1,2,3,4,5,6,7,8,9,10}
