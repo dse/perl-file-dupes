@@ -24,7 +24,8 @@ Getopt::Long::GetOptions(
     "v|verbose+" => \$verbose,
     "n|dry-run" => \$dry_run,
     "V|verify" => \$verify,
-) or die("unknown option\n");
+    "help" => sub { usage(); exit(0); },
+) or die("Type '$PROGNAME --help' for help.\n");
 
 sub usage { print <<"END"; }
 usage:
