@@ -41,6 +41,7 @@ sub find_by_filename {
     my $verify   = $options{verify};
     my $progress = $options{progress};
 
+    my %is_a_first_filename;
     my %by_basename;
     my %index;
     my $index = 0;
@@ -56,10 +57,13 @@ sub find_by_filename {
             }
             my $basename = $_;
             my $filename = $File::Find::name;
+
             my @lstat = lstat($_);
             return if (!scalar @lstat);
             return if (-d _) || (!-f _) || (-s _ < $min_size);
+
             my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = @lstat;
+            $is_a_first_filename{$filename} = 1;
             push(@{$by_basename{$basename}}, { filename => $filename, dev => $dev, ino => $ino, size => $size });
             $index{$filename} = ++$index; # in order in which directories are specified
         };
@@ -134,12 +138,29 @@ sub find_by_filename {
                 my @group_filenames = @$file_group;
                 push(@results, [@group_filenames]) if defined wantarray;
                 if ($callback && ref $callback eq 'CODE') {
-                    &$callback(filenames => \@group_filenames,
-                               hard_link_groups => \%hard_link_groups,
-                               verbose => $verbose,
-                               dry_run => $dry_run,
-                               verify => $verify,
-                               progress => $progress);
+                    my %args = (
+                        filenames => \@group_filenames,
+                        hard_link_groups => \%hard_link_groups,
+                        verbose => $verbose,
+                        dry_run => $dry_run,
+                        verify => $verify,
+                        progress => $progress,
+                    );
+                    {
+                        my ($junk, @filenames) = @group_filenames;
+                        if (grep { $is_a_first_filename{$_} } @filenames) {
+                            warn("failed not-the-first-filename check:\n");
+                            foreach my $filename (@group_filenames) {
+                                if ($is_a_first_filename{$filename}) {
+                                    warn("*   $filename\n");
+                                } else {
+                                    warn("    $filename\n");
+                                }
+                            }
+                            die();
+                        }
+                    }
+                    &$callback(%args);
                 }
             }
         }
