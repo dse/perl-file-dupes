@@ -64,21 +64,26 @@ sub find_side_by_side_1 {
     my %count;
     my @results;
     my $wanted = sub {
-        my @lstat = lstat($_);
-        return if (!scalar @lstat);
         if ($progress) {
             my $count = ($count{$File::Find::dir} += 1);
             progress("%s %d", $File::Find::dir, $count);
         }
+        my $filename = $_;
+        my $first_filename = $_;
+
+        my @lstat = lstat($filename);
+        return if (!scalar @lstat);
         return if (-d _) || (!-f _) || (-s _ < $min_size);
-        my $rel = abs2rel($_, $dir);
+
+        my $rel = abs2rel($filename, $dir);
         return if $done_hash->{$rel};
         $done_hash->{$rel} = 1;
+
         my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = @lstat;
         my @other_filenames = map { "$_/$rel" } @other_dirs;
         @other_filenames = grep { -f $_ && -s $_ == $size } @other_filenames;
         return unless scalar @other_filenames;
-        my @filenames = ($_, @other_filenames);
+        my @filenames = ($filename, @other_filenames);
         my @hard_link_groups = group_hard_links(@filenames);
         return if scalar @hard_link_groups < 2;
         my @main_filenames = map { $_->[0] } @hard_link_groups;
@@ -93,12 +98,29 @@ sub find_side_by_side_1 {
             push(@results, [@group_filenames]) if defined wantarray;
             if ($callback && ref $callback eq 'CODE') {
                 progress() if $progress;
-                &$callback(filenames => \@group_filenames,
-                           hard_link_groups => \%hard_link_groups,
-                           verbose => $verbose,
-                           dry_run => $dry_run,
-                           verify => $verify,
-                           progress => $progress);
+                my %args = (
+                    filenames => \@group_filenames,
+                    hard_link_groups => \%hard_link_groups,
+                    verbose => $verbose,
+                    dry_run => $dry_run,
+                    verify => $verify,
+                    progress => $progress,
+                );
+                {
+                    my ($junk, @filenames) = @group_filenames;
+                    if (grep { $_ eq $first_filename } @filenames) {
+                        warn("failed not-the-first-filename check:\n");
+                        foreach my $filename (@group_filenames) {
+                            if ($filename eq $first_filename) {
+                                warn("*   $filename\n");
+                            } else {
+                                warn("    $filename\n");
+                            }
+                        }
+                        die();
+                    }
+                }
+                &$callback(%args);
             }
         }
     };
