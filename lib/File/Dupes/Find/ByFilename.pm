@@ -67,7 +67,7 @@ sub find_by_filename {
                 $is_a_first_filename{$filename} = 1;
             }
             push(@{$by_basename{$basename}}, { filename => $filename, dev => $dev, ino => $ino, size => $size });
-            $index{$filename} = ++$index; # in order in which directories are specified
+            $index{$filename} = ++$index;
         };
         progress() if $progress;
         File::Find::find({ wanted => $wanted }, $dir);
@@ -139,6 +139,7 @@ sub find_by_filename {
             my @file_groups = check_for_dupes(@main_filenames);
             foreach my $file_group (@file_groups) {
                 my @group_filenames = @$file_group;
+                @group_filenames = sort { $index{$a} <=> $index{$b} } @group_filenames; # for good measure
                 push(@results, [@group_filenames]) if defined wantarray;
                 if ($callback && ref $callback eq 'CODE') {
                     my %args = (
@@ -149,27 +150,6 @@ sub find_by_filename {
                         verify => $verify,
                         progress => $progress,
                     );
-                    {
-                        my ($junk, @other_filenames) = @group_filenames;
-                        my @ordered_group_filenames = sort { $index{$a} <=> $index{$b} } @group_filenames;
-                        my $a = "@group_filenames";
-                        my $b = "@ordered_group_filenames";
-                        if ($a ne $b) {
-                            warn("filename order was not maintained\n");
-                            warn("initial order:\n");
-                            warn("    $_\n") foreach @ordered_group_filenames;
-                            warn("order might be deleted:\n");
-                            warn("    $_\n") foreach @group_filenames;
-                            die();
-                        }
-                        if (grep { $is_a_first_filename{$_} } @other_filenames) {
-                            warn("possibility of deleting filename in first directory specified is nonzero.\n");
-                            warn("first directory is: $dirs[0]\n");
-                            warn("order might be deleted:\n");
-                            warn("    $_\n") foreach @group_filenames;
-                            die();
-                        }
-                    }
                     &$callback(%args);
                 }
             }
