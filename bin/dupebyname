@@ -2,7 +2,9 @@
 use warnings;
 use strict;
 use open qw(locale);
+our $PROGNAME = basename($0);
 
+use File::Basename qw(basename);
 use Getopt::Long;
 use Scalar::Util qw(looks_like_number);
 
@@ -23,6 +25,11 @@ Getopt::Long::GetOptions(
     "n|dry-run" => \$dry_run,
     "V|verify" => \$verify,
 ) or die("unknown option\n");
+
+sub usage { print <<"END"; }
+usage:
+    $PROGNAME [-v|--verbose] [-n|--dry-run] [-V|--verify] <dir> [<dir2> ...]
+END
 
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
