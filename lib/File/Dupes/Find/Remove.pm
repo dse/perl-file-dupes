@@ -47,7 +47,9 @@ sub remove_callback {
         }
     }
     my ($main_filename, @other_filenames) = @filenames;
-    @other_filenames = grep { $_ !~ m{^\Q$no_delete_dir\E/} } @other_filenames; # never delete files here
+    if (defined $no_delete_dir) {
+        @other_filenames = grep { $_ !~ m{^\Q$no_delete_dir\E/} } @other_filenames; # never delete files here
+    }
     foreach my $filename (@other_filenames) {
         my @links = @{$hard_link_groups{$filename}};
         my $index = 0;
