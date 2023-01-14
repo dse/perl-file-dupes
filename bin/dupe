@@ -1,0 +1,59 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use open qw(locale);
+our $PROGNAME = basename($0);
+
+use File::Basename qw(basename);
+use Getopt::Long;
+use Scalar::Util qw(looks_like_number);
+
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+
+use File::Dupes::Find::Everywhere qw(find_everywhere);
+use File::Dupes::Find::Confirm qw(confirm_duplicates confirm_hard_links);
+use File::Dupes::Find::Remove qw(remove_callback);
+
+our $verbose = 0;
+our $progress = 0;
+our $dry_run = 0;
+our $verify = 0;
+
+Getopt::Long::Configure(qw(gnu_compat bundling no_ignore_case));
+Getopt::Long::GetOptions(
+    "v|verbose+" => \$verbose,
+    "progress+" => \$progress,
+    "n|dry-run" => \$dry_run,
+    "V|verify" => \$verify,
+    "help" => sub { usage(); exit(0); },
+) or die("Type '$PROGNAME --help' for help.\n");
+
+sub usage { print <<"END"; }
+usage:
+    $PROGNAME [-v|--verbose] [--progress] [-n|--dry-run] [-V|--verify]
+        <dir1> [<dir2> ...]
+END
+
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
+
+my $min_size = 1048576;
+if (scalar @ARGV && looks_like_number($ARGV[0])) {
+    $min_size = shift(@ARGV);
+}
+
+die("not enough arguments\n") if scalar @ARGV < 2;
+my (@dirnames) = @ARGV;
+
+my $callback = \&remove_callback;
+
+find_everywhere(@dirnames, {
+    verify => $verify,
+    verbose => $verbose,
+    dry_run => $dry_run,
+    progress => $progress,
+
+    callback => $callback,
+    min_size => $min_size,
+});
