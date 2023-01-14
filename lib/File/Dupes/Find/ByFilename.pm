@@ -42,7 +42,7 @@ sub find_by_filename {
     my $progress = $options{progress};
 
     my %filenames_by_basename;
-    my %devino;
+    my %dev_ino;
     my %size;
     foreach my $dir (@dirs) {
         if ($verbose) {
@@ -64,7 +64,7 @@ sub find_by_filename {
 
             my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = @lstat;
             push(@{$filenames_by_basename{$basename}}, $filename);
-            $devino{$filename} = [$dev,$ino];
+            $dev_ino{$filename} = [$dev,$ino];
             $size{$filename} = $size;
         };
         progress() if $progress;
@@ -92,7 +92,7 @@ sub find_by_filename {
         my $first_filename = $filenames[0];
         my %filenames_by_dev_ino;
         foreach my $filename (@filenames) {
-            my ($dev, $ino) = @{$devino{$filename}};
+            my ($dev, $ino) = @{$dev_ino{$filename}};
             push(@{$filenames_by_dev_ino{$dev,$ino}}, $filename);
         }
         my %hardlinks_by_main_filename;
@@ -137,7 +137,7 @@ sub find_by_filename {
 
         # free up memory gradually.
         foreach my $filename (@{$filenames_by_basename{$basename}}) {
-            delete $devino{$filename};
+            delete $dev_ino{$filename};
             delete $size{$filename};
         }
         delete $filenames_by_basename{$basename};
