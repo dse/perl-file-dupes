@@ -3,17 +3,38 @@ use warnings;
 use strict;
 use open qw(:locale);
 
+use Data::Dumper qw();
+use Getopt::Long;
+
+our $force;
+our $dry_run;
+
+Getopt::Long::Configure('gnu_compat', 'bundling', 'no_ignore_case');
+Getopt::Long::GetOptions(
+    'f|force' => \$force,
+    'n|dryRun' => \$dry_run,
+) or die(":-(\n");
+
+if (!$force && !$dry_run) {
+    die("specify --force OR --dry-run\n");
+}
+if ($force && $dry_run) {
+    die("specify --force OR --dry-run\n");
+}
+
 use FindBin;
 use lib "${FindBin::Bin}/../lib";
 
-use File::Dupes;
+use File::Dupes qw(check_for_dupes);
 
-my ($base_dir, @dirs) = @ARGV;
+my @all_dirs = @ARGV;
+my ($base_dir, @other_dirs) = @all_dirs;
+@ARGV = ();
 
 sub order {
     my ($filename) = @_;
-    for (my $i = 0; $i < scalar @dirs; $i += 1) {
-        my $prefix = $dirs[$i] . '/';
+    for (my $i = 0; $i < scalar @all_dirs; $i += 1) {
+        my $prefix = $all_dirs[$i] . '/';
         if (substr($filename, 0, length($prefix)) eq $prefix) {
             return $i;
         }
@@ -33,21 +54,25 @@ while (<>) {
     }
     push(@bysize, $filename);
 }
+process($lastsize, @bysize);
 
 sub process {
     my ($size, @files) = @_;
+    @files = grep { order($_) != -1 } @files;
     return if scalar @files < 2;
-    my @groups = check_for_dupes(@ARGV);
+
+    # warn("checking the following files for duplicates:\n");
+    # warn("    $_\n") foreach @files;
+
+    my @groups = check_for_dupes(@files);
+    # print(dumper(\@groups));
     foreach my $group (@groups) {
         my @files = @$group;
 
-        # exclude files in the first directory we specified as we need
-        # to keep those
-        my @keep = grep { m{^\Q$base_dir\E} } @files;
-        @files = grep { ! m{^\Q$base_dir\E} } @files;
+        my $size = -s $files[0];
 
-        # which of the other directory trees we specified was each
-        # file found in?
+        # which of our directory trees we specified was each file
+        # found in?
         @files = map { [$_, order($_)] } @files;
 
         # exclude files not found in any of them
@@ -57,11 +82,28 @@ sub process {
         # specified
         @files = sort { $a->[1] <=> $b->[1] } @files;
 
-        if (!scalar @keep) {
-            push(@keep, shift(@files));
-        }
+        @files = map { $_->[0] } @files;
 
-        print("keep $_\n") foreach @keep;
-        print("rm   $_\n") foreach @files;
+        my $keep = shift(@files);
+
+        if ($force) {
+            foreach my $file (@files) {
+                if (unlink($file)) {
+                    warn("removed $file ($size bytes)\n");
+                } else {
+                    unlink($file) or warn("$file: $!\n");
+                }
+            }
+        } elsif ($dry_run) {
+            print("keep $size $keep\n");
+            print("rm   $size $_\n") foreach @files;
+        }
     }
+}
+
+sub dumper {
+    local $Data::Dumper::Terse = 1;
+    local $Data::Dumper::Indent = 1;
+    local $Data::Dumper::Sortkeys = 1;
+    return Data::Dumper::Dumper(shift);
 }
