@@ -44,6 +44,15 @@ sub indexed {
     return {%index_of} if defined wantarray;
 }
 
+our $BYTES;
+our $MAXOPEN;
+BEGIN {
+    $BYTES = 4096;
+    $MAXOPEN = 16;
+}
+
+use Fcntl qw(SEEK_SET);
+
 sub check_for_dupes {
     my (@filenames) = @_;
 
@@ -53,35 +62,53 @@ sub check_for_dupes {
 
     return if scalar @filenames < 2; # sanity check
 
-    my %error;
     my %fh;
+    my %done;
+    my $touch_counter = 0;
+    my %touched = map { ($_ => 0) } @filenames;
 
-    # open all files.
-    foreach my $filename (@filenames) {
-        my $fh = gensym();
-        if (!open($fh, '<:raw', $filename)) {
-            $error{$filename} = $!;
-        } else {
-            $fh{$filename} = $fh;
-        }
-    }
-
-    @filenames = grep { defined $fh{$_} } @filenames; # successful files only
-    return if scalar @filenames < 2; # sanity check
-
+    my $offset = 0;
     my @results;    # collect groups of files having the same content.
     my @groups = ([@filenames]); # initialize with one group
+  iter:
     while (1) {
         my @newgroups; # collect groups for next iteration of this loop
+      group:
         foreach my $group (@groups) {
             # all files in here have the same content thus far.
             my @done; # collect files we finished reading last iteration
             my %group; # yes, we're using 4096-byte chunks as hash keys :-D
+          file:
             foreach my $filename (@$group) {
                 my $data;
-                my $bytes = sysread($fh{$filename}, $data, 4096);
+
+                my $fh = $fh{$filename};
+                if (!defined $fh) {
+                    while (scalar keys %fh >= $MAXOPEN) {
+                        my @touched = sort { $touched{$a} <=> $touched{$b} } keys %fh;
+                        my $oldest = $touched[0];
+                        $fh = $fh{$oldest};
+                        close($fh);
+                        delete $fh{$oldest};
+                    }
+                    if (!open($fh, '<:raw', $filename)) {
+                        warn("$filename: $!\n");
+                        next file;
+                    }
+                    if ($offset) {
+                        my $real_offset = sysseek($fh, $offset, SEEK_SET);
+                        if ($real_offset != $offset) {
+                            close($fh);
+                            next file;
+                        }
+                    }
+                    $fh{$filename} = $fh;
+                }
+
+                my $bytes = sysread($fh, $data, $BYTES);
+                $touched{$filename} = ++$touch_counter;
                 if (!defined $bytes) {
-                    close($fh{$filename});
+                    close($fh);
                     delete $fh{$filename};
                 } elsif (!$bytes) {
                     close($fh{$filename});
@@ -108,6 +135,7 @@ sub check_for_dupes {
             return [@results];
         }
         @groups = @newgroups;
+        $offset += $BYTES;
     }
 }
 
