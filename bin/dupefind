@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -o errexit
+set -o pipefail
+set -o nounset
+shopt -s lastpipe
+
+# default to current directory
+if (( $# < 1 )) ; then
+    set -- .
+fi
+
+exec find "$@" -type f -printf '%b %D %i 0%m %n %s %Ts %p\n'
