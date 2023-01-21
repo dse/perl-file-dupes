@@ -1,0 +1,67 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use open qw(:locale);
+
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+
+use File::Dupes;
+
+my ($base_dir, @dirs) = @ARGV;
+
+sub order {
+    my ($filename) = @_;
+    for (my $i = 0; $i < scalar @dirs; $i += 1) {
+        my $prefix = $dirs[$i] . '/';
+        if (substr($filename, 0, length($prefix)) eq $prefix) {
+            return $i;
+        }
+    }
+    return -1;
+}
+
+my @bysize;
+my $lastsize = -1;
+while (<>) {
+    s{\R\z}{};
+    my ($blocks, $dev, $ino, $mode, $nlinks, $size, $mtime, $filename) = split();
+    if ($lastsize != $size) {
+        process($lastsize, @bysize);
+        @bysize = ();
+        $lastsize = $size;
+    }
+    push(@bysize, $filename);
+}
+
+sub process {
+    my ($size, @files) = @_;
+    return if scalar @files < 2;
+    my @groups = check_for_dupes(@ARGV);
+    foreach my $group (@groups) {
+        my @files = @$group;
+
+        # exclude files in the first directory we specified as we need
+        # to keep those
+        my @keep = grep { m{^\Q$base_dir\E} } @files;
+        @files = grep { ! m{^\Q$base_dir\E} } @files;
+
+        # which of the other directory trees we specified was each
+        # file found in?
+        @files = map { [$_, order($_)] } @files;
+
+        # exclude files not found in any of them
+        @files = grep { $_->[1] != -1 } @files;
+
+        # order first directory tree specified to last directory tree
+        # specified
+        @files = sort { $a->[1] <=> $b->[1] } @files;
+
+        if (!scalar @keep) {
+            push(@keep, shift(@files));
+        }
+
+        print("keep $_\n") foreach @keep;
+        print("rm   $_\n") foreach @files;
+    }
+}
