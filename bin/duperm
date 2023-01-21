@@ -12,7 +12,7 @@ our $dry_run;
 Getopt::Long::Configure('gnu_compat', 'bundling', 'no_ignore_case');
 Getopt::Long::GetOptions(
     'f|force' => \$force,
-    'n|dryRun' => \$dry_run,
+    'n|dry-run' => \$dry_run,
 ) or die(":-(\n");
 
 if (!$force && !$dry_run) {
@@ -77,6 +77,11 @@ sub process {
 
         # exclude files not found in any of them
         @files = grep { $_->[1] != -1 } @files;
+
+        # exclude files found in first dir --- we want to keep ALL of
+        # them --- even if there are multiple duplicates in the first
+        # directory
+        @files = grep { $_->[1] != 0 } @files;
 
         # order first directory tree specified to last directory tree
         # specified
